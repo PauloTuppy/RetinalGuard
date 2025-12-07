@@ -1,0 +1,139 @@
+RETINALGUARD - COMPLETE SYSTEM ARCHITECTURE
+
+┌─────────────────────────────────────────────────────────────────────┐
+│                        USER INTERFACE LAYER                         │
+│                                                                     │
+│  ┌──────────────────┐        ┌──────────────────┐                  │
+│  │  Mobile App      │        │  Web Dashboard   │                  │
+│  │  (Flutter)       │        │  (React)         │                  │
+│  │                  │        │                  │                  │
+│  │ - View results   │        │ - Clinic portal  │                  │
+│  │ - Get feedback   │        │ - Patient list   │                  │
+│  │ - Share report   │        │ - Analytics      │                  │
+│  └──────────────────┘        └──────────────────┘                  │
+└────────────┬─────────────────────────┬──────────────────────────────┘
+             │                         │
+             │      WiFi / HTTPS       │
+             ↓                         ↓
+┌──────────────────────────────────────────────────────────────────────┐
+│                    TUYA CLOUD AI AGENT LAYER                         │
+│  ┌────────────────────────────────────────────────────────────────┐ │
+│  │ Claude / Gemini / DeepSeek - Medical Report Generation        │ │
+│  │                                                                │ │
+│  │ Input: CVD risk + vitals → Output: Human-readable report      │ │
+│  │ - Risk classification (HIGH/MODERATE/LOW)                     │ │
+│  │ - Clinical recommendations                                   │ │
+│  │ - Follow-up scheduling                                        │ │
+│  │ - Patient education                                           │ │
+│  └────────────────────────────────────────────────────────────────┘ │
+│                                                                      │
+│  ┌────────────────────────────────────────────────────────────────┐ │
+│  │ Data Management & Audit Trail (HIPAA/LGPD)                   │ │
+│  │ - Encryption at rest                                          │ │
+│  │ - Access control (role-based)                                │ │
+│  │ - Audit logging                                              │ │
+│  └────────────────────────────────────────────────────────────────┘ │
+└────────────┬──────────────────────────────────────────────────────────┘
+             │
+             │  MQTT (TLS Encrypted)
+             │  Device ID: RetinalGuard-T5-001
+             │
+             ↓
+┌──────────────────────────────────────────────────────────────────────┐
+│        TUYA T5 AI-CORE EDGE DEVICE (ARMv8-M 480MHz, 16MB RAM)       │
+│                                                                      │
+│  ┌──────────────────────────────────────────────────────────────┐  │
+│  │ INPUT ACQUISITION LAYER                                      │  │
+│  │                                                              │  │
+│  │  GC2145 Camera (DVP)      PPG Sensor         Temp Sensor    │  │
+│  │  ├─ Fundus image          (MAX30102)         (DHT22)        │  │
+│  │  └─ 256×256 RGB           │ I2C               │ ADC         │  │
+│  │                           │ Heart Rate        │ Temperature │  │
+│  │                           └─ O2 Saturation    └─ ~37°C      │  │
+│  └──────────────────────────────────────────────────────────────┘  │
+│                              ↓                                       │
+│  ┌──────────────────────────────────────────────────────────────┐  │
+│  │ PREPROCESSING LAYER                                          │  │
+│  │                                                              │  │
+│  │  Image Processing:          Sensor Reading:                 │  │
+│  │  ├─ Resize to 256×256      ├─ Read PPG I2C                │  │
+│  │  ├─ Histogram equalization │├─ Detect R-peak (HR)         │  │
+│  │  ├─ Normalization [-1,+1]  ├─ Read ADC (temp)             │  │
+│  │  └─ RGB to tensor          └─ Timestamp all data           │  │
+│  │                                                              │  │
+│  │  Latency: 50-100ms                                          │  │
+│  └──────────────────────────────────────────────────────────────┘  │
+│                              ↓                                       │
+│  ┌──────────────────────────────────────────────────────────────┐  │
+│  │ INFERENCE LAYER (TensorFlow Lite)                            │  │
+│  │                                                              │  │
+│  │  Model: MobileNetV3-Small (Quantized INT8)                 │  │
+│  │  Size: 8-12 MB (fits in 16MB PSRAM)                         │  │
+│  │  Input: [1, 256, 256, 3] float tensor                       │  │
+│  │  Output: CVD Risk Score [0.0 - 1.0]                         │  │
+│  │                                                              │  │
+│  │  Inference Time: 400-500ms (on ARMv8-M @ 480MHz)           │  │
+│  │  Precision: INT8 quantized (FP32 pruned)                    │  │
+│  │  Accuracy: 70-75% vs. clinical gold standard               │  │
+│  └──────────────────────────────────────────────────────────────┘  │
+│                              ↓                                       │
+│  ┌──────────────────────────────────────────────────────────────┐  │
+│  │ FUSION LAYER                                                 │  │
+│  │                                                              │  │
+│  │  Combine retinal + vital signs:                             │  │
+│  │  Final Risk = 60% × Retinal_Risk + 40% × Vitals_Risk       │  │
+│  │                                                              │  │
+│  │  Estimate Systolic BP from retinal vessel features          │  │
+│  │  (Vessel caliber ratio analysis)                            │  │
+│  │                                                              │  │
+│  │  Output: [cvd_risk, hr, o2, temp, systolic_bp]             │  │
+│  └──────────────────────────────────────────────────────────────┘  │
+│                              ↓                                       │
+│  ┌──────────────────────────────────────────────────────────────┐  │
+│  │ STORAGE & CONNECTIVITY                                       │  │
+│  │                                                              │  │
+│  │  Local Storage (SD Card - Optional):                        │  │
+│  │  ├─ Results cached locally (offline operation)              │  │
+│  │  ├─ Encrypted SQLite DB for privacy                        │  │
+│  │  └─ Firmware update files                                   │  │
+│  │                                                              │  │
+│  │  Cloud Connectivity (MQTT):                                 │  │
+│  │  ├─ Send: [patient_id, risk_score, vitals, timestamp]      │  │
+│  │  ├─ TLS encryption (no raw image sent)                      │  │
+│  │  └─ Automatic reconnect on network loss                     │  │
+│  └──────────────────────────────────────────────────────────────┘  │
+│                                                                      │
+│  Total E2E Latency: < 1 minute (capture → result)                  │
+│  Power: 5V USB-C (2W average)                                       │
+1007: └──────────────────────────────────────────────────────────────────────┘
+
+DEPLOYMENT EXAMPLE - COMMUNITY CLINIC:
+
+  ┌─────────────────────────────┐
+  │  RetinalGuard Scanner       │  Mounted on clinic desk
+  │  (T5 + Camera + Sensors)    │
+  └──────────────┬──────────────┘
+                 │
+        (WiFi)   │    (Secure MQTT/TLS)
+                 │
+         ┌───────┴────────┐
+         │                │
+    ┌────▼─────┐    ┌─────▼──────┐
+    │ Local     │    │ Tuya Cloud │
+    │ Display   │    │ (Reports)  │
+    └───────────┘    └─────┬──────┘
+                           │
+                      (HTTPS)
+                           │
+                    ┌──────▼──────┐
+                    │ Clinic Staff│
+                    │ Dashboard   │  View results, manage patients
+                    └─────────────┘
+
+FEATURES:
+✓ Edge-first: All computation on T5 (no cloud dependency for core inference)
+✓ Privacy: Raw fundus images never leave device
+✓ Offline: Works without internet connection
+✓ Scalable: MQTT protocol supports 1000+ devices per clinic
+✓ Compliant: HIPAA/LGPD data handling
+✓ Accessible: Simple UI for non-tech users

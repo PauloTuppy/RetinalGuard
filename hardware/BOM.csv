@@ -1,0 +1,7 @@
+Component,Model,Cost,Notes
+Tuya T5 AI-Core Board,T5-E1,$45,Main processor
+Camera Module,GC2145 (2MP DVP),$15,Fundus capture
+PPG Sensor,MAX30102,$8,Heart rate + O2
+Temperature Sensor,DHT22,$3,Environmental temp
+USB-C Power,5V 1A,$5,Board power
+Camera Adapter (3D print),Custom,$2,Optical alignment
